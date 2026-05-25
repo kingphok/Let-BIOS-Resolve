@@ -1,0 +1,21 @@
+## @file  LetBiosResolvePkg.dec
+# Let BIOS Resolve package provide service and example for resolution which SW/HW have no resource to fix.
+#
+# Copyright (c) 2026, King-Phok Ngôo (Jingbo Wu).<BR>
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+
+[Defines]
+  DEC_SPECIFICATION  = 0x00010005
+  PACKAGE_NAME       = LetBiosResolvePkg
+  PACKAGE_GUID       = 30EFF5CE-AD84-4318-9A23-B511D6700C06
+  PACKAGE_VERSION    = 0.1
+
+[Includes]
+  Include
+
+[Guids]
+  ## {A0993C30-80CD-4409-AA70-DD37A72BB9C9}
+  gEfiLetBiosResolvePkgTokenSpaceGuid    = {0xa0993c30, 0x80cd, 0x4409, {0xaa, 0x70, 0xdd, 0x37, 0xa7, 0x2b, 0xb9, 0xc9}}
+
+[Protocols]
