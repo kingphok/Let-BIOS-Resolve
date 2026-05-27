@@ -7,13 +7,14 @@
 
 #include "AcpiHwSigOverrideDxe.h"
 
+ACPI_HW_SIG_OVERRIDE_PROTOCOL            *mAcpiHwSigOverrideProtocol = NULL;
 EFI_ACPI_SDT_PROTOCOL                    *mAcpiSdtProtocol = NULL;
 LIST_ENTRY                               mDataLinkList;
 
 /**
- Wrap original FreePool gBS call in order to decrease code length (with setting back Buffer to NULL).
+  Wrap original FreePool gBS call in order to decrease code length (with setting back Buffer to NULL).
 
- @param[in] Buffer  Pointer to the allocated memory address.
+  @param[in]  Buffer  Pointer to the allocated memory address.
 **/
 VOID
 SafeFreePool (
@@ -24,6 +25,30 @@ SafeFreePool (
     gBS->FreePool (*Buffer);
     *Buffer = NULL;
   }
+}
+
+/**
+  Dump the data in hex format.
+
+  @param[in]  Location  The pointer to the data buffer.
+  @param[in]  Length    The size of the data buffer in bytes.
+**/
+EFI_STATUS
+HexDump (
+  IN VOID                                *Location,
+  IN UINTN                               Length
+  )
+{
+  UINTN                                  Index;
+
+  DEBUG ((DEBUG_INFO,"  Memory Address %016LX 0x%X Bytes\n  ", Location, Length));
+
+  for (Index = 0; Index < Length; Index++) {
+    DEBUG ((DEBUG_INFO, "0x%02x ", ((UINT8 *) Location)[Index]));
+  }
+  DEBUG ((DEBUG_INFO, "\n"));
+
+  return EFI_SUCCESS;
 }
 
 /**
@@ -40,8 +65,11 @@ ReadyToBootCallback (
   )
 {
   EFI_STATUS                             Status;
+  LIST_ENTRY                             *Link;
+  APPEND_DATA_INSTANCE                   *AppendDataInstance;
 
-  Status = EFI_SUCCESS;
+  Status             = EFI_SUCCESS;
+  AppendDataInstance = NULL;
 
   DEBUG ((DEBUG_INFO, "[LBR] ReadyToBootCallback Entry.\n"));
 
@@ -51,6 +79,12 @@ ReadyToBootCallback (
   //
   if (Event != NULL) {
     gBS->CloseEvent (Event);
+  }
+
+  Link = GetFirstNode (&mDataLinkList);
+  if (IsNull (&mDataLinkList, Link)) {
+    DEBUG ((DEBUG_INFO, "[LBR] No AppendData be recorded.\n"));
+    goto SeviceComplete;
   }
 
   //
@@ -71,9 +105,31 @@ ReadyToBootCallback (
   // Caculate the hardware signature and update it to ACPI FACS table if need.
   //
 
+SeviceComplete:
+  //
+  // Free AppendData instances.
+  //
+  Link = &mDataLinkList;
+  while (!IsListEmpty (Link)) {
+    AppendDataInstance = BASE_CR (Link->ForwardLink, APPEND_DATA_INSTANCE, LinkList);
+    DEBUG ((DEBUG_INFO, "[LBR] Free AppendDataInstance\n"));
+    DEBUG_CODE (
+      HexDump (AppendDataInstance->AppendData, AppendDataInstance->AppendDataSize);
+    );
+    RemoveEntryList (Link->ForwardLink);
+    SafeFreePool ((VOID **) &AppendDataInstance->AppendData);
+    SafeFreePool ((VOID **) &AppendDataInstance);
+  }
+
   //
   // Uninstall ACPI Hardware Signature Override protocol.
   //
+  Status = gBS->UninstallProtocolInterface (
+                  Context, // ImageHandle
+                  &gAcpiHwSigOverrideProtocolGuid,
+                  (VOID *) mAcpiHwSigOverrideProtocol
+                  );
+  DEBUG ((DEBUG_INFO, "[LBR] Uninstall mAcpiHwSigOverrideProtocol %r\n", Status));
 
   return;
 }
@@ -139,7 +195,6 @@ AcpiHwSigOverrideDxeEntryPoint (
   )
 {
   EFI_STATUS                             Status;
-  ACPI_HW_SIG_OVERRIDE_PROTOCOL          *AcpiHwSigOverrideProtocol;
   EFI_EVENT                              Event;
 
   Status       = EFI_SUCCESS;
@@ -150,17 +205,17 @@ AcpiHwSigOverrideDxeEntryPoint (
   //
   // Install ACPI Hardware Signature Override protocol
   //
-  AcpiHwSigOverrideProtocol = AllocateZeroPool (sizeof (ACPI_HW_SIG_OVERRIDE_PROTOCOL));
-  if (AcpiHwSigOverrideProtocol != NULL) {
+  mAcpiHwSigOverrideProtocol = AllocateZeroPool (sizeof (ACPI_HW_SIG_OVERRIDE_PROTOCOL));
+  if (mAcpiHwSigOverrideProtocol != NULL) {
     InitializeListHead (&mDataLinkList);
-    AcpiHwSigOverrideProtocol->AppendData = AcpiHwSigOverrideAppendData;
+    mAcpiHwSigOverrideProtocol->AppendData = AcpiHwSigOverrideAppendData;
     Status = gBS->InstallProtocolInterface (
                     &ImageHandle,
                     &gAcpiHwSigOverrideProtocolGuid,
                     EFI_NATIVE_INTERFACE,
-                    AcpiHwSigOverrideProtocol
+                    mAcpiHwSigOverrideProtocol
                     );
-    DEBUG ((DEBUG_INFO, "[LBR] Install AcpiHwSigOverrideProtocol %r\n", Status));
+    DEBUG ((DEBUG_INFO, "[LBR] Install mAcpiHwSigOverrideProtocol %r\n", Status));
   }
 
   //
@@ -169,7 +224,7 @@ AcpiHwSigOverrideDxeEntryPoint (
   Status = EfiCreateEventReadyToBootEx (
              TPL_CALLBACK,
              ReadyToBootCallback,
-             NULL,
+             ImageHandle,
              &Event
              );
   if (EFI_ERROR (Status)) {
