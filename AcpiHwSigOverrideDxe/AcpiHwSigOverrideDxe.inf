@@ -1,0 +1,43 @@
+## @file
+#  AcpiHwSigOverrideDxe.inf
+#
+#  Copyright (c) 2026, King-Phok Ngôo (Jingbo Wu).<BR>
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+##
+
+[Defines]
+  INF_VERSION     = 0x00010005
+  BASE_NAME       = AcpiHwSigOverrideDxe
+  FILE_GUID       = 1D963F19-917F-46B2-A510-2886B7A84D34
+  MODULE_TYPE     = DXE_DRIVER
+  VERSION_STRING  = 1.0
+  ENTRY_POINT     = AcpiHwSigOverrideDxeEntryPoint
+
+[Sources]
+  AcpiHwSigOverrideDxe.c
+
+[Packages]
+  LetBiosResolvePkg/LetBiosResolvePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  UefiDriverEntryPoint
+  UefiBootServicesTableLib
+  UefiLib
+  MemoryAllocationLib
+  BaseMemoryLib
+  DebugLib
+  BaseLib
+
+[Guids]
+  gEfiLetBiosResolvePkgTokenSpaceGuid
+
+[Protocols]
+  gAcpiHwSigOverrideProtocolGuid
+  gEfiAcpiSdtProtocolGuid
+
+[Pcd]
+
+[Depex]
+  TRUE

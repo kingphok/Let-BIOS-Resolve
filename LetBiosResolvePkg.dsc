@@ -16,4 +16,4 @@
   SKUID_IDENTIFIER         = DEFAULT
 
 [Components.X64]
-
+  LetBiosResolvePkg/AcpiHwSigOverrideDxe/AcpiHwSigOverrideDxe.inf
