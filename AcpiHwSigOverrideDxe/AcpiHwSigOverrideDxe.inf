@@ -36,6 +36,7 @@
 [Protocols]
   gAcpiHwSigOverrideProtocolGuid
   gEfiAcpiSdtProtocolGuid
+  gEfiAcpiTableProtocolGuid
 
 [Pcd]
 

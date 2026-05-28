@@ -51,60 +51,6 @@ HexDump (
 }
 
 /**
-  Get the current hardware signature from the ACPI FACS table.
-
-  @param[in, out]  HardwareSignature  The pointer to the current hardware signature.
-**/
-EFI_STATUS
-GetCurrentHwSig (
-  OUT UINT32                               *HardwareSignature
-  )
-{
-  EFI_STATUS                             Status;
-  EFI_ACPI_SDT_PROTOCOL                  *AcpiSdtProtocol;
-  UINTN                                  TableIndex;
-  EFI_ACPI_SDT_HEADER                    *Table;
-  EFI_ACPI_TABLE_VERSION                 Version;
-  UINTN                                  TableKey;
-
-  Status          = EFI_NOT_FOUND;
-  AcpiSdtProtocol = NULL;
-  TableIndex      = 0;
-  Table           = NULL;
-  Version         = 0;
-  TableKey        = 0;
-
-  Status = gBS->LocateProtocol (
-                  &gEfiAcpiSdtProtocolGuid,
-                  NULL,
-                  (VOID **) &AcpiSdtProtocol
-                  );
-  if (EFI_ERROR (Status)) {
-    DEBUG ((DEBUG_INFO, "[LBR] Locate gEfiAcpiSdtProtocolGuid %r.\n", Status));
-    return Status;
-  }
-
-  do {
-    Status = AcpiSdtProtocol->GetAcpiTable (TableIndex, &Table, &Version, &TableKey);
-    if (EFI_ERROR (Status)) {
-      DEBUG ((DEBUG_INFO, "[LBR] GetAcpiTable[%d], %r.\n", TableIndex, Status));
-      break;
-    }
-
-    TableIndex++;
-
-    if (Table->Signature == SIGNATURE_32('F', 'A', 'C', 'S')) {
-      *HardwareSignature = ((EFI_ACPI_6_3_FIRMWARE_ACPI_CONTROL_STRUCTURE*) Table)->HardwareSignature;
-      DEBUG ((DEBUG_INFO, "[LBR] Current Hardware Signature: 0x%X\n", *HardwareSignature));
-      Status = EFI_SUCCESS;
-      break;
-    }
-  } while (TRUE);
-
-  return Status;
-}
-
-/**
   Ready To Boot callback function.
 
   @param[in]  Event     Event whose notification function is being invoked
@@ -120,11 +66,24 @@ ReadyToBootCallback (
   EFI_STATUS                             Status;
   LIST_ENTRY                             *Link;
   APPEND_DATA_INSTANCE                   *AppendDataInstance;
-  UINT32                                 CurrentHardwareSignature;
+  EFI_ACPI_SDT_PROTOCOL                  *AcpiSdtProtocol;
+  EFI_ACPI_TABLE_PROTOCOL                *AcpiTableProtocol;
+  UINTN                                  TableIndex;
+  EFI_ACPI_SDT_HEADER                    *Table;
+  EFI_ACPI_SDT_HEADER                    *NewTable;
+  EFI_ACPI_TABLE_VERSION                 Version;
+  UINTN                                  TableKey;
+  UINTN                                  NewTableKey;
 
-  Status                   = EFI_SUCCESS;
-  AppendDataInstance       = NULL;
-  CurrentHardwareSignature = 0;
+  Status             = EFI_SUCCESS;
+  AppendDataInstance = NULL;
+  AcpiSdtProtocol    = NULL;
+  AcpiTableProtocol  = NULL;
+  TableIndex         = 0;
+  Table              = NULL;
+  NewTable           = NULL;
+  Version            = 0;
+  TableKey           = 0;
 
   DEBUG ((DEBUG_INFO, "[LBR] ReadyToBootCallback Entry.\n"));
 
@@ -143,17 +102,67 @@ ReadyToBootCallback (
   }
 
   //
-  // Get the ACPI SDT protocol
+  // Check ACPI SDT & Table protocol.
   //
-  Status = GetCurrentHwSig (&CurrentHardwareSignature);
+  Status = gBS->LocateProtocol (&gEfiAcpiSdtProtocolGuid, NULL, (VOID **) &AcpiSdtProtocol);
   if (EFI_ERROR (Status)) {
-    DEBUG ((DEBUG_INFO, "[LBR] No Current HardwareSignature found.\n"));
+    DEBUG ((DEBUG_INFO, "[LBR] Locate gEfiAcpiSdtProtocolGuid %r.\n", Status));
+    goto SeviceComplete;
+  }
+  Status = gBS->LocateProtocol (&gEfiAcpiTableProtocolGuid, NULL, (VOID **) &AcpiTableProtocol);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_INFO, "[LBR] Locate gEfiAcpiTableProtocolGuid %r.\n", Status));
     goto SeviceComplete;
   }
 
   //
-  // Caculate the hardware signature and update it to ACPI FACS table if need.
+  // Search ACPI FACS table.
   //
+  do {
+    Status = AcpiSdtProtocol->GetAcpiTable (TableIndex, &Table, &Version, &TableKey);
+    if (EFI_ERROR (Status)) {
+      DEBUG ((DEBUG_INFO, "[LBR] GetAcpiTable[%d], %r.\n", TableIndex, Status));
+      break;
+    }
+
+    TableIndex++;
+
+    if (Table->Signature == SIGNATURE_32('F', 'A', 'C', 'S')) {
+      DEBUG ((DEBUG_INFO, "[LBR] Original Hardware Signature: 0x%X\n", ((EFI_ACPI_6_3_FIRMWARE_ACPI_CONTROL_STRUCTURE*) Table)->HardwareSignature));
+      Status = EFI_SUCCESS;
+      break;
+    }
+  } while (TRUE);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_INFO, "[LBR] No FACS table found %r.\n", Status));
+    goto SeviceComplete;
+  }
+
+  //
+  // Calculate new hardware signature with original hardware signature and appended data.
+  //
+
+  //
+  // Duplicate ACPI FACS table with new hardware signature.
+  //
+  NewTable = AllocateCopyPool (Table->Length, (VOID *) Table);
+  if (NewTable == NULL) {
+    DEBUG ((DEBUG_INFO, "[LBR] AllocateCopyPool for new FACS table out of resources.\n"));
+    goto SeviceComplete;
+  }
+
+  //
+  // Remove old ACPI FACS Table then Install new ACPI FACS Table with overridden hardware signature.
+  //
+  Status = AcpiTableProtocol->UninstallAcpiTable (AcpiTableProtocol, TableKey);
+  if (!EFI_ERROR (Status)) {
+    Status = AcpiTableProtocol->InstallAcpiTable (AcpiTableProtocol, NewTable, NewTable->Length, &NewTableKey);
+    if (EFI_ERROR (Status)) {
+      DEBUG ((DEBUG_INFO, "[LBR] Install new ACPI FACS Table %r.\n", Status));
+    }
+  } else {
+    DEBUG ((DEBUG_INFO, "[LBR] Cannot uninstall old ACPI FACS Table %r.\n", Status));
+  }
 
 SeviceComplete:
   //
@@ -180,6 +189,8 @@ SeviceComplete:
                   (VOID *) mAcpiHwSigOverrideProtocol
                   );
   DEBUG ((DEBUG_INFO, "[LBR] Uninstall mAcpiHwSigOverrideProtocol %r\n", Status));
+
+  SafeFreePool ((VOID **) &NewTable);
 
   return;
 }
