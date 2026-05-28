@@ -1,6 +1,9 @@
 /** @file
   AcpiHwSigOverrideDxe.c
 
+  This protocol collects custom data, calculates a new CRC32 checksum Hardware Signature,
+  and updates it into the ACPI FACS table during Ready to Boot event.
+
   Copyright (c) 2026, King-Phok Ngôo (Jingbo Wu).<BR>
   SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
@@ -74,6 +77,7 @@ ReadyToBootCallback (
   EFI_ACPI_TABLE_VERSION                 Version;
   UINTN                                  TableKey;
   UINTN                                  NewTableKey;
+  UINT32                                 NewHwSig;
 
   Status             = EFI_SUCCESS;
   AppendDataInstance = NULL;
@@ -84,6 +88,7 @@ ReadyToBootCallback (
   NewTable           = NULL;
   Version            = 0;
   TableKey           = 0;
+  NewHwSig           = 0;
 
   DEBUG ((DEBUG_INFO, "[LBR] ReadyToBootCallback Entry.\n"));
 
@@ -141,6 +146,18 @@ ReadyToBootCallback (
   //
   // Calculate new hardware signature with original hardware signature and appended data.
   //
+  NewHwSig = ((EFI_ACPI_6_3_FIRMWARE_ACPI_CONTROL_STRUCTURE*) Table)->HardwareSignature;
+  Link = GetFirstNode (&mDataLinkList);
+  while (!IsNull (&mDataLinkList, Link)) {
+    AppendDataInstance = BASE_CR (Link, APPEND_DATA_INSTANCE, LinkList);
+    NewHwSig = CalculateCrc32c ((VOID *) AppendDataInstance->AppendData, AppendDataInstance->AppendDataSize, NewHwSig);
+    DEBUG ((DEBUG_INFO, "[LBR] HwSig Append Data:\n"));
+    DEBUG_CODE (
+      HexDump (AppendDataInstance->AppendData, AppendDataInstance->AppendDataSize);
+    );
+    DEBUG ((DEBUG_INFO, "[LBR] New HwSig: 0x%X\n", NewHwSig));
+    Link = GetNextNode (&mDataLinkList, Link);
+  }
 
   //
   // Duplicate ACPI FACS table with new hardware signature.
@@ -150,6 +167,8 @@ ReadyToBootCallback (
     DEBUG ((DEBUG_INFO, "[LBR] AllocateCopyPool for new FACS table out of resources.\n"));
     goto SeviceComplete;
   }
+
+  ((EFI_ACPI_6_3_FIRMWARE_ACPI_CONTROL_STRUCTURE*) NewTable)->HardwareSignature = NewHwSig;
 
   //
   // Remove old ACPI FACS Table then Install new ACPI FACS Table with overridden hardware signature.
