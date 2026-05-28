@@ -8,10 +8,12 @@
 #ifndef _ACPI_HW_SIG_OVERRIDE_DXE_H_
 #define _ACPI_HW_SIG_OVERRIDE_DXE_H_
 
+#include <Uefi.h>
+#include <IndustryStandard/Acpi.h>
+
 //
 // Libraries
 //
-#include <Uefi.h>
 #include <Library/UefiLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/MemoryAllocationLib.h>

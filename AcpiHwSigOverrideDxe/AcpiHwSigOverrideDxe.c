@@ -8,7 +8,6 @@
 #include "AcpiHwSigOverrideDxe.h"
 
 ACPI_HW_SIG_OVERRIDE_PROTOCOL            *mAcpiHwSigOverrideProtocol = NULL;
-EFI_ACPI_SDT_PROTOCOL                    *mAcpiSdtProtocol = NULL;
 LIST_ENTRY                               mDataLinkList;
 
 /**
@@ -52,6 +51,60 @@ HexDump (
 }
 
 /**
+  Get the current hardware signature from the ACPI FACS table.
+
+  @param[in, out]  HardwareSignature  The pointer to the current hardware signature.
+**/
+EFI_STATUS
+GetCurrentHwSig (
+  OUT UINT32                               *HardwareSignature
+  )
+{
+  EFI_STATUS                             Status;
+  EFI_ACPI_SDT_PROTOCOL                  *AcpiSdtProtocol;
+  UINTN                                  TableIndex;
+  EFI_ACPI_SDT_HEADER                    *Table;
+  EFI_ACPI_TABLE_VERSION                 Version;
+  UINTN                                  TableKey;
+
+  Status          = EFI_NOT_FOUND;
+  AcpiSdtProtocol = NULL;
+  TableIndex      = 0;
+  Table           = NULL;
+  Version         = 0;
+  TableKey        = 0;
+
+  Status = gBS->LocateProtocol (
+                  &gEfiAcpiSdtProtocolGuid,
+                  NULL,
+                  (VOID **) &AcpiSdtProtocol
+                  );
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_INFO, "[LBR] Locate gEfiAcpiSdtProtocolGuid %r.\n", Status));
+    return Status;
+  }
+
+  do {
+    Status = AcpiSdtProtocol->GetAcpiTable (TableIndex, &Table, &Version, &TableKey);
+    if (EFI_ERROR (Status)) {
+      DEBUG ((DEBUG_INFO, "[LBR] GetAcpiTable[%d], %r.\n", TableIndex, Status));
+      break;
+    }
+
+    TableIndex++;
+
+    if (Table->Signature == SIGNATURE_32('F', 'A', 'C', 'S')) {
+      *HardwareSignature = ((EFI_ACPI_6_3_FIRMWARE_ACPI_CONTROL_STRUCTURE*) Table)->HardwareSignature;
+      DEBUG ((DEBUG_INFO, "[LBR] Current Hardware Signature: 0x%X\n", *HardwareSignature));
+      Status = EFI_SUCCESS;
+      break;
+    }
+  } while (TRUE);
+
+  return Status;
+}
+
+/**
   Ready To Boot callback function.
 
   @param[in]  Event     Event whose notification function is being invoked
@@ -67,9 +120,11 @@ ReadyToBootCallback (
   EFI_STATUS                             Status;
   LIST_ENTRY                             *Link;
   APPEND_DATA_INSTANCE                   *AppendDataInstance;
+  UINT32                                 CurrentHardwareSignature;
 
-  Status             = EFI_SUCCESS;
-  AppendDataInstance = NULL;
+  Status                   = EFI_SUCCESS;
+  AppendDataInstance       = NULL;
+  CurrentHardwareSignature = 0;
 
   DEBUG ((DEBUG_INFO, "[LBR] ReadyToBootCallback Entry.\n"));
 
@@ -90,15 +145,10 @@ ReadyToBootCallback (
   //
   // Get the ACPI SDT protocol
   //
-  if (mAcpiSdtProtocol == NULL) {
-    Status = gBS->LocateProtocol (
-                  &gEfiAcpiSdtProtocolGuid,
-                  NULL,
-                  (VOID **) &mAcpiSdtProtocol
-                  );
-    if (EFI_ERROR (Status)) {
-      DEBUG ((DEBUG_INFO, "[LBR] Locate gEfiAcpiSdtProtocolGuid %r\n", Status));
-    }
+  Status = GetCurrentHwSig (&CurrentHardwareSignature);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_INFO, "[LBR] No Current HardwareSignature found.\n"));
+    goto SeviceComplete;
   }
 
   //
