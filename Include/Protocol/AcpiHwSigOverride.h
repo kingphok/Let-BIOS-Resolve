@@ -26,7 +26,7 @@ typedef struct _ACPI_HW_SIG_OVERRIDE_PROTOCOL ACPI_HW_SIG_OVERRIDE_PROTOCOL;
 typedef
 EFI_STATUS
 (EFIAPI *APPEND_DATA) (
-  IN UINT8                               *Data,
+  IN VOID                                *Data,
   IN UINTN                               DataSize
   );
 

@@ -204,7 +204,7 @@ SeviceComplete:
 **/
 EFI_STATUS
 AcpiHwSigOverrideAppendData (
-  IN UINT8                               *Data,
+  IN VOID                                *Data,
   IN UINTN                               DataSize
   )
 {
