@@ -1,0 +1,42 @@
+## @file
+#  SyncWindowsFastStartupDxe.inf
+#
+#  Example DXE driver that consumes the ACPI Hardware Signature Override Protocol
+#  and appends a BIOS Setup variable to the ACPI Hardware Signature.
+#
+#  Copyright (c) 2026, King-Phok Ngôo (Jingbo Wu).<BR>
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION     = 0x00010005
+  BASE_NAME       = SyncWindowsFastStartupDxe
+  FILE_GUID       = C5F60592-9E40-4F92-A8AF-2C6847F23CE8
+  MODULE_TYPE     = DXE_DRIVER
+  VERSION_STRING  = 1.0
+  ENTRY_POINT     = SyncWindowsFastStartupDxeEntryPoint
+
+[Sources]
+  SyncWindowsFastStartupDxe.c
+
+[Packages]
+  LetBiosResolvePkg/LetBiosResolvePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  UefiDriverEntryPoint
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  UefiLib
+  MemoryAllocationLib
+  DebugLib
+
+[Protocols]
+  gAcpiHwSigOverrideProtocolGuid
+
+[Pcd]
+
+[Depex]
+  TRUE
