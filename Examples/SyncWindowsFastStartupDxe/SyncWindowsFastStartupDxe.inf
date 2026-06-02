@@ -39,4 +39,4 @@
 [Pcd]
 
 [Depex]
-  TRUE
+  gAcpiHwSigOverrideProtocolGuid
