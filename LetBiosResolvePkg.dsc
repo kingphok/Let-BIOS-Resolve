@@ -17,3 +17,4 @@
 
 [Components.X64]
   LetBiosResolvePkg/AcpiHwSigOverrideDxe/AcpiHwSigOverrideDxe.inf
+  LetBiosResolvePkg/Examples/SyncWindowsFastStartupDxe/SyncWindowsFastStartupDxe.inf
