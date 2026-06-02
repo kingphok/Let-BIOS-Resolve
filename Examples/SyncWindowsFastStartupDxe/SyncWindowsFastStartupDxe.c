@@ -62,7 +62,7 @@ SyncWindowsFastStartupDxeEntryPoint (
                   );
   if (EFI_ERROR (Status)) {
     DEBUG ((DEBUG_ERROR, "[LBR] ACPI HW Sig Override Protocol not found: %r\n", Status));
-    return EFI_NOT_FOUND;
+    goto Done;
   }
 
   Status = GetVariable2 (
