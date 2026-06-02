@@ -53,7 +53,7 @@ SyncWindowsFastStartupDxeEntryPoint (
   SetupVarSize = 0;
   HwSigOverrideProtocol = NULL;
 
-  DEBUG ((DEBUG_INFO, "[LBR] SyncWindowsFastStartupDxe Entry\n"));
+  DEBUG ((DEBUG_INFO, "[%a] SyncWindowsFastStartupDxe Entry\n", __FUNCTION__));
 
   Status = gBS->LocateProtocol (
                   &gAcpiHwSigOverrideProtocolGuid,
@@ -61,7 +61,7 @@ SyncWindowsFastStartupDxeEntryPoint (
                   (VOID **) &HwSigOverrideProtocol
                   );
   if (EFI_ERROR (Status)) {
-    DEBUG ((DEBUG_ERROR, "[LBR] ACPI HW Sig Override Protocol not found: %r\n", Status));
+    DEBUG ((DEBUG_ERROR, "[%a] ACPI HW Sig Override Protocol not found: %r\n", __FUNCTION__, Status));
     goto Done;
   }
 
@@ -72,20 +72,14 @@ SyncWindowsFastStartupDxeEntryPoint (
              &SetupVarSize
              );
   if (EFI_ERROR (Status) || (SetupVarSize == 0) || (SetupVarData == NULL)) {
-    DEBUG ((DEBUG_INFO, "[LBR] Sync variable '%a' not present or empty: %r\n", \
-      "SyncWindowsFastStartup", Status));
+    DEBUG ((DEBUG_INFO, "[%a] Get variable L\"%s\": %r\n", __FUNCTION__, SYNC_WINDOWS_FAST_STARTUP_VARIABLE_NAME, Status));
     goto Done;
   }
 
-  DEBUG ((DEBUG_INFO,
-    "[LBR] Appending BIOS Setup sync variable '%a' to Hardware Signature (size %u)\n",
-    "SyncWindowsFastStartup",
-    SetupVarSize
-    ));
-
+  DEBUG ((DEBUG_INFO, "[%a] Appending BIOS Setup sync variable L\"%s\" to Hardware Signature (size %u)\n", __FUNCTION__, SYNC_WINDOWS_FAST_STARTUP_VARIABLE_NAME, SetupVarSize));
   Status = HwSigOverrideProtocol->AppendData (SetupVarData, SetupVarSize);
   if (EFI_ERROR (Status)) {
-    DEBUG ((DEBUG_ERROR, "[LBR] Failed to append setup variable to HW signature: %r\n", Status));
+    DEBUG ((DEBUG_ERROR, "[%a] Failed to append setup variable to HW signature: %r\n", __FUNCTION__, Status));
   }
 
 Done:
